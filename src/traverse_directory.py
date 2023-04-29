@@ -2,19 +2,22 @@ import os
 import sys
 from pathlib import Path
 
-def is_ancestor_directory(ancestor, descendant):
+def is_ancestor_directory(potential_ancestor, dir):
     """
     Check if the ancestor directory is an ancestor of the descendant directory.
 
-    :param ancestor: The ancestor directory path.
-    :param descendant: The descendant directory path.
+    :param potential_ancestor: The ancestor directory path.
+    :param dir: The directory to check path.
     :return: True if the ancestor directory is an ancestor of the descendant directory, False otherwise.
     """
-    ancestor = os.path.abspath(os.path.realpath(ancestor))
-    descendant = os.path.abspath(os.path.realpath(descendant))
 
-    return descendant.startswith(ancestor)
+    # should return true if ancestor is located anywhere in the path of descendant
+    # e.g. /home/user/ancestor is an ancestor of /home/user/ancestor/descendant
 
+    potential_ancestor = os.path.abspath(os.path.realpath(potential_ancestor))
+    dir = os.path.abspath(os.path.realpath(dir))
+
+    return os.path.commonpath([potential_ancestor]) == os.path.commonpath([potential_ancestor, dir])
 
 def traverse_directory(path, max_symlink_visits, visited_symlinks=None, indent="", output=None, starting_path=None):
     """
@@ -42,8 +45,7 @@ def traverse_directory(path, max_symlink_visits, visited_symlinks=None, indent="
     try:
         with os.scandir(path) as entries:
             for entry in entries:
-                if is_ancestor_directory(entry.path, starting_path):
-                    continue
+                
                 if not entry.is_symlink():
 
                     if entry.is_dir(follow_symlinks=False):
@@ -53,18 +55,20 @@ def traverse_directory(path, max_symlink_visits, visited_symlinks=None, indent="
                     elif entry.is_file():
                         output.append(indent + os.path.relpath(entry.path, starting_path))
                 else:
+
                     target = os.readlink(entry.path)
                     target_path = Path(entry.path).parent / target
                     target_path = target_path.resolve()
+
                     output.append(indent + os.path.relpath(entry.path, starting_path) + " -> " + os.path.relpath(target_path, starting_path))
-                    
+                                    
                     new_indent = indent + "  "
                     if target_path not in visited_symlinks:
                         visited_symlinks[target_path] = 0
 
                     if visited_symlinks[target_path] < max_symlink_visits:
                         visited_symlinks[target_path] += 1
-                        if target_path.is_dir():
+                        if target_path.is_dir() and not is_ancestor_directory(target_path, starting_path):
                             traverse_directory(target_path, max_symlink_visits, visited_symlinks, new_indent, output, starting_path)
                     else:
                         output.append(f"Maximum visits for symlink ({max_symlink_visits}) reached. Skipping further traversal.")

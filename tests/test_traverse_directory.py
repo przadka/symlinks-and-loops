@@ -1,6 +1,4 @@
 import pytest
-import os
-import shutil
 
 from pathlib import Path
 from src.traverse_directory import traverse_directory
@@ -89,13 +87,38 @@ def test_symlink_to_dir(tmp_path):
     
     expected_output = [
         "symlink_dir -> dir",
-        "  dir/file.txt", "dir/",
+        "  dir/file.txt",
+        "dir/",
         "  dir/file.txt",
         ]
     
     assert output == expected_output
 
-def test_symlink_with_ancestor(tmp_path):
+
+def test_symlink_to_ancestor(tmp_path):
+
+    d = tmp_path / "one/two/three"
+    d.mkdir(parents=True)
+
+    symlink_dir = tmp_path / "one/two/three/two"
+    symlink_dir.symlink_to(tmp_path / "one/two")
+
+
+    file = d / "file.txt"
+    file.write_text("content")
+
+    output = traverse_directory(tmp_path, max_symlink_visits=3)
+    
+    expected_output = [
+        "one/",
+        "  one/two/",
+        "    one/two/three/",
+        "  dir/file.txt",
+        ]
+    
+    assert output == expected_output
+
+def test_symlink_with_ancestor_complicated(tmp_path):
 
     # Create directories
     o = tmp_path / "outsidedir/four/five/six"
